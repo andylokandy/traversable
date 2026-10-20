@@ -16,6 +16,7 @@
 
 use core::ops::ControlFlow;
 
+use crate::Continue;
 use crate::Visitor;
 use crate::VisitorMut;
 
@@ -24,7 +25,8 @@ pub trait VisitorExt: Visitor {
     /// Combines two visitors into one that runs them in sequence.
     ///
     /// If the first visitor returns [`ControlFlow::Break`], the combined visitor returns that break
-    /// immediately. Otherwise, it runs the second visitor.
+    /// immediately. If the first skips a node, the second does not enter it. If only the
+    /// second skips, the first leaves immediately. Either skip suppresses children.
     ///
     /// # Examples
     ///
@@ -92,7 +94,8 @@ pub trait VisitorMutExt: VisitorMut {
     /// Combines two mutable visitors into one that runs them in sequence.
     ///
     /// If the first visitor returns [`ControlFlow::Break`], the combined visitor returns that break
-    /// immediately. Otherwise, it runs the second visitor.
+    /// immediately. If the first skips a node, the second does not enter it. If only the
+    /// second skips, the first leaves immediately. Either skip suppresses children.
     ///
     /// # Examples
     ///
@@ -172,9 +175,15 @@ where
 {
     type Break = V1::Break;
 
-    fn enter(&mut self, this: &dyn core::any::Any) -> ControlFlow<Self::Break> {
-        self.visitor1.enter(this)?;
-        self.visitor2.enter(this)
+    fn enter(&mut self, this: &dyn core::any::Any) -> ControlFlow<Self::Break, Continue> {
+        if let Continue::Skip = self.visitor1.enter(this)? {
+            return ControlFlow::Continue(Continue::Skip);
+        }
+        if let Continue::Skip = self.visitor2.enter(this)? {
+            self.visitor1.leave(this)?;
+            return ControlFlow::Continue(Continue::Skip);
+        }
+        ControlFlow::Continue(Continue::Children(()))
     }
 
     fn leave(&mut self, this: &dyn core::any::Any) -> ControlFlow<Self::Break> {
@@ -190,9 +199,15 @@ where
 {
     type Break = V1::Break;
 
-    fn enter_mut(&mut self, this: &mut dyn core::any::Any) -> ControlFlow<Self::Break> {
-        self.visitor1.enter_mut(this)?;
-        self.visitor2.enter_mut(this)
+    fn enter_mut(&mut self, this: &mut dyn core::any::Any) -> ControlFlow<Self::Break, Continue> {
+        if let Continue::Skip = self.visitor1.enter_mut(this)? {
+            return ControlFlow::Continue(Continue::Skip);
+        }
+        if let Continue::Skip = self.visitor2.enter_mut(this)? {
+            self.visitor1.leave_mut(this)?;
+            return ControlFlow::Continue(Continue::Skip);
+        }
+        ControlFlow::Continue(Continue::Children(()))
     }
 
     fn leave_mut(&mut self, this: &mut dyn core::any::Any) -> ControlFlow<Self::Break> {

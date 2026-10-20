@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use std::ops::ControlFlow;
 use std::rc::Rc;
 
+use traversable::Continue;
 use traversable::Traversable;
 use traversable::TraversableMut;
 use traversable::Visitor;
@@ -42,7 +43,7 @@ struct RecordVisitor {
 impl Visitor for RecordVisitor {
     type Break = i32;
 
-    fn enter(&mut self, this: &dyn Any) -> ControlFlow<Self::Break> {
+    fn enter(&mut self, this: &dyn Any) -> ControlFlow<Self::Break, Continue> {
         if let Some(d) = this.downcast_ref::<Data>() {
             self.log
                 .borrow_mut()
@@ -51,7 +52,7 @@ impl Visitor for RecordVisitor {
                 return ControlFlow::Break(d.val);
             }
         }
-        ControlFlow::Continue(())
+        ControlFlow::Continue(Continue::Children(()))
     }
 
     fn leave(&mut self, this: &dyn Any) -> ControlFlow<Self::Break> {
@@ -180,11 +181,11 @@ struct MutVisitor {
 
 impl VisitorMut for MutVisitor {
     type Break = ();
-    fn enter_mut(&mut self, this: &mut dyn Any) -> ControlFlow<()> {
+    fn enter_mut(&mut self, this: &mut dyn Any) -> ControlFlow<(), Continue> {
         if let Some(d) = this.downcast_mut::<Data>() {
             d.val *= self.val_multiplier;
         }
-        ControlFlow::Continue(())
+        ControlFlow::Continue(Continue::Children(()))
     }
 }
 

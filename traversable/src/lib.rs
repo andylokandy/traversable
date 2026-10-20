@@ -165,12 +165,6 @@ impl From<()> for Continue {
     }
 }
 
-impl<S> From<Continue<S>> for ControlFlow<(), Continue<S>> {
-    fn from(value: Continue<S>) -> Self {
-        Self::Continue(value)
-    }
-}
-
 /// A visitor that can be used to traverse a data structure.
 ///
 /// Implement this trait to define custom logic that executes when

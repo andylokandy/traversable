@@ -22,7 +22,7 @@ use crate::VisitorMut;
 
 /// Extension trait for [`Visitor`]s.
 pub trait VisitorExt: Visitor {
-    /// Combines two visitors into one that runs them in sequence.
+    /// Combines two visitors, entering in order and leaving in reverse order.
     ///
     /// If the first visitor returns [`ControlFlow::Break`], the combined visitor returns that break
     /// immediately. If the first skips a node, the second does not enter it. If only the
@@ -91,7 +91,7 @@ impl<V: Visitor> VisitorExt for V {}
 
 /// Extension trait for [`VisitorMut`]s.
 pub trait VisitorMutExt: VisitorMut {
-    /// Combines two mutable visitors into one that runs them in sequence.
+    /// Combines two mutable visitors, entering in order and leaving in reverse order.
     ///
     /// If the first visitor returns [`ControlFlow::Break`], the combined visitor returns that break
     /// immediately. If the first skips a node, the second does not enter it. If only the
@@ -160,7 +160,7 @@ pub trait VisitorMutExt: VisitorMut {
 
 impl<V: VisitorMut> VisitorMutExt for V {}
 
-/// A visitor that runs two visitors in sequence.
+/// A visitor that enters two visitors in order and leaves them in reverse order.
 ///
 /// This struct is created by [`VisitorExt::chain`] or [`VisitorMutExt::chain`].
 pub struct Chain<V1, V2> {
@@ -187,8 +187,8 @@ where
     }
 
     fn leave(&mut self, this: &dyn core::any::Any) -> ControlFlow<Self::Break> {
-        self.visitor1.leave(this)?;
-        self.visitor2.leave(this)
+        self.visitor2.leave(this)?;
+        self.visitor1.leave(this)
     }
 }
 
@@ -211,7 +211,7 @@ where
     }
 
     fn leave_mut(&mut self, this: &mut dyn core::any::Any) -> ControlFlow<Self::Break> {
-        self.visitor1.leave_mut(this)?;
-        self.visitor2.leave_mut(this)
+        self.visitor2.leave_mut(this)?;
+        self.visitor1.leave_mut(this)
     }
 }

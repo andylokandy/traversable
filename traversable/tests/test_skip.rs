@@ -109,15 +109,17 @@ fn scoped_state_with_chained_skip() {
         if let Node::Leaf(_) = node {
             depths.push(depth);
         }
-        Continue::Children(depth)
+        ControlFlow::<(), _>::Continue(Continue::Children(depth))
     });
-    let skip = visitor_events(|node: &Node, event| match event {
-        VisitEvent::Enter(_) if matches!(node, Node::Pruned(_)) => Continue::Skip,
-        VisitEvent::Enter(_) => Continue::Children(()),
-        VisitEvent::Leave(()) => {
-            assert!(!matches!(node, Node::Pruned(_)));
-            Continue::Skip
-        }
+    let skip = visitor_events(|node: &Node, event| {
+        ControlFlow::<(), _>::Continue(match event {
+            VisitEvent::Enter(_) if matches!(node, Node::Pruned(_)) => Continue::Skip,
+            VisitEvent::Enter(_) => Continue::Children(()),
+            VisitEvent::Leave(()) => {
+                assert!(!matches!(node, Node::Pruned(_)));
+                Continue::Skip
+            }
+        })
     });
     assert!(nodes.traverse(&mut state.chain(skip)).is_continue());
     assert_eq!(depths, [2, 1]);

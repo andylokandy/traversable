@@ -30,6 +30,10 @@ mod events;
 #[cfg(feature = "std")]
 pub use self::events::VisitEvent;
 #[cfg(feature = "std")]
+pub use self::events::visitor_enter_scoped;
+#[cfg(feature = "std")]
+pub use self::events::visitor_enter_scoped_mut;
+#[cfg(feature = "std")]
 pub use self::events::visitor_events;
 #[cfg(feature = "std")]
 pub use self::events::visitor_events_mut;

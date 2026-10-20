@@ -25,6 +25,8 @@ use traversable::combinator::VisitorExt;
 use traversable::combinator::VisitorMutExt;
 use traversable::function::VisitEvent;
 use traversable::function::visitor;
+use traversable::function::visitor_enter_scoped;
+use traversable::function::visitor_enter_scoped_mut;
 use traversable::function::visitor_events;
 use traversable::function::visitor_events_mut;
 use traversable::function::visitor_mut;
@@ -102,51 +104,50 @@ fn scoped_state_with_chained_skip() {
         Node::Leaf(0),
     ];
     let mut depths = Vec::new();
-    let state = visitor_events(|node: &Node, event| {
-        ControlFlow::<(), _>::Continue(match event {
-            VisitEvent::Enter(parent) => Continue::Children(parent.copied().unwrap_or(0) + 1),
-            VisitEvent::Leave(depth) => {
-                if let Node::Leaf(_) = node {
-                    depths.push(depth);
-                }
-                Continue::Skip
-            }
-        })
+    let state = visitor_enter_scoped(|node: &Node, parent: Option<&i32>| {
+        let depth = parent.copied().unwrap_or(0) + 1;
+        if let Node::Leaf(_) = node {
+            depths.push(depth);
+        }
+        Continue::Children(depth)
     });
-    let skip = visitor_events(|node: &Node, event| {
-        ControlFlow::<(), _>::Continue(match event {
-            VisitEvent::Enter(_) if matches!(node, Node::Pruned(_)) => Continue::Skip,
-            VisitEvent::Enter(_) => Continue::Children(()),
-            VisitEvent::Leave(()) => {
-                assert!(!matches!(node, Node::Pruned(_)));
-                Continue::Skip
-            }
-        })
+    let skip = visitor_events(|node: &Node, event| match event {
+        VisitEvent::Enter(_) if matches!(node, Node::Pruned(_)) => Continue::Skip,
+        VisitEvent::Enter(_) => Continue::Children(()),
+        VisitEvent::Leave(()) => {
+            assert!(!matches!(node, Node::Pruned(_)));
+            Continue::Skip
+        }
     });
     assert!(nodes.traverse(&mut state.chain(skip)).is_continue());
     assert_eq!(depths, [2, 1]);
 
     // Reversing the chain also covers a skip by the first visitor.
-    let skip = visitor_events_mut(|node: &mut Node, event| {
-        ControlFlow::<(), _>::Continue(match event {
-            VisitEvent::Enter(_) if matches!(node, Node::Pruned(_)) => Continue::Skip,
-            VisitEvent::Enter(_) => Continue::Children(()),
-            VisitEvent::Leave(()) => Continue::Skip,
+    let skip = visitor_enter_scoped_mut(|node: &mut Node, _| {
+        ControlFlow::<i32, _>::Continue(match node {
+            Node::Pruned(_) => Continue::Skip,
+            _ => Continue::Children(()),
         })
     });
     let state = visitor_events_mut(|node: &mut Node, event| {
         assert!(!matches!(node, Node::Pruned(_)));
-        ControlFlow::<(), _>::Continue(match event {
+        ControlFlow::<i32, _>::Continue(match event {
             VisitEvent::Enter(parent) => Continue::Children(parent.copied().unwrap_or(0) + 1),
             VisitEvent::Leave(depth) => {
                 if let Node::Leaf(value) = node {
                     *value = depth;
+                    if depth == 1 {
+                        return ControlFlow::Break(depth);
+                    }
                 }
                 Continue::Skip
             }
         })
     });
-    assert!(nodes.traverse_mut(&mut skip.chain(state)).is_continue());
+    assert_eq!(
+        nodes.traverse_mut(&mut skip.chain(state)),
+        ControlFlow::Break(1)
+    );
     let Node::Branch(children) = &nodes[0] else {
         panic!()
     };
